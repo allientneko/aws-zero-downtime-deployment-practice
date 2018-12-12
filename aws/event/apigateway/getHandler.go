@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
@@ -9,6 +10,10 @@ import (
 
 func main() {
 	lambda.Start(GetHandler)
+}
+
+type respond struct {
+	Message string `json:"message"`
 }
 
 func GetHandler(req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
@@ -27,7 +32,11 @@ func GetHandler(req events.APIGatewayProxyRequest) (events.APIGatewayProxyRespon
 	birthdayDay := queryResult.DateOfBirth.Day()
 
 	if currentDate.Month() == birthdayMonth && currentDate.Day() == birthdayDay {
-		return events.APIGatewayProxyResponse{Body: fmt.Sprintf("Hello, %s! Happy birthday!", name), StatusCode: 200}, nil
+		body, err := json.Marshal(respond{ Message: fmt.Sprintf("Hello, %s! Happy birthday!", name) })
+		if err != nil {
+			return events.APIGatewayProxyResponse{StatusCode: 500}, err
+		}
+		return events.APIGatewayProxyResponse{Body: string(body), StatusCode: 200, Headers: map[string]string{"Content-Type": "application/json"} }, nil
 	}
 
 	if currentDate.Month() < birthdayMonth {
@@ -48,5 +57,10 @@ func GetHandler(req events.APIGatewayProxyRequest) (events.APIGatewayProxyRespon
 
 	days := int(time.Until(birthday).Hours() / 24)
 
-	return events.APIGatewayProxyResponse{Body: fmt.Sprintf("Hello, %s! Your birthday is in %d days", name, days), StatusCode: 200}, nil
+	body, err := json.Marshal(respond{ Message: fmt.Sprintf("Hello, %s! Your birthday is in %d days", name, days) })
+	if err != nil {
+		return events.APIGatewayProxyResponse{StatusCode: 500}, err
+	}
+
+	return events.APIGatewayProxyResponse{Body: string(body), StatusCode: 200, Headers: map[string]string{"Content-Type": "application/json"}}, nil
 }

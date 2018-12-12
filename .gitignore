@@ -2,3 +2,6 @@
 
 .idea
 .DS_Store
+package.yml
+.env
+deployments/dist

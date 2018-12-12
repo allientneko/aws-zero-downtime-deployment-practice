@@ -53,7 +53,7 @@ func Get(name string) (*person, error) {
 		TableName: aws.String(os.Getenv("TABLE_NAME")),
 		Key: map[string]*dynamodb.AttributeValue{
 			"name": {
-				N: aws.String(name),
+				S: aws.String(name),
 			},
 		},
 	})

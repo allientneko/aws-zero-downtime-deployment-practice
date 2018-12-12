@@ -1,24 +1,32 @@
 AWSTemplateFormatVersion: 2010-09-09
 Transform: AWS::Serverless-2016-10-31
 Resources:
-  GetPerson:
+  GetPersonLambda:
     Type: AWS::Serverless::Function
     Properties:
-      Handler: dist/awshandler/getHandler
+      Handler: dist/handler/getHandler
       Runtime: go1.x
       Tracing: Active
+      Policies: AmazonDynamoDBReadOnlyAccess
+      Environment:
+        Variables:
+            TABLE_NAME: !Ref Table
       Events:
         GetEvent:
           Type: Api
           Properties:
             Path: /hello/{name}
             Method: get
-  PutPerson:
+  PutPersonLambda:
     Type: AWS::Serverless::Function
     Properties:
-      Handler: dist/awshandler/putHandler
+      Handler: dist/handler/putHandler
       Runtime: go1.x
       Tracing: Active
+      Policies: AmazonDynamoDBFullAccess
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref Table
       Events:
         GetEvent:
           Type: Api
@@ -30,8 +38,90 @@ Resources:
     Properties:
       AttributeDefinitions:
         -
-          AttributeName: ""
-
+          AttributeName: "name"
+          AttributeType: "S"
+      KeySchema:
+        -
+          AttributeName: "name"
+          KeyType: "HASH"
+      TableName: "birthday"
+      ProvisionedThroughput:
+        ReadCapacityUnits: 5
+        WriteCapacityUnits: 5
+  TableScalingRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - "application-autoscaling.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      Path: "/"
+      Policies:
+        - PolicyName: root
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "dynamodb:DescribeTable"
+                  - "dynamodb:UpdateTable"
+                  - "cloudwatch:PutMetricAlarm"
+                  - "cloudwatch:DescribeAlarms"
+                  - "cloudwatch:GetMetricStatistics"
+                  - "cloudwatch:SetAlarmState"
+                  - "cloudwatch:DeleteAlarms"
+                Resource: "*"
+  TableReadTarget:
+    Type: AWS::ApplicationAutoScaling::ScalableTarget
+    DependsOn: TableScalingRole
+    Properties:
+      MaxCapacity: 1000
+      MinCapacity: 5
+      ResourceId: table/birthday
+      RoleARN: !GetAtt TableScalingRole.Arn
+      ScalableDimension: dynamodb:table:ReadCapacityUnits
+      ServiceNamespace: dynamodb
+  TableWriteTarget:
+    Type: AWS::ApplicationAutoScaling::ScalableTarget
+    DependsOn: TableScalingRole
+    Properties:
+      MaxCapacity: 1000
+      MinCapacity: 5
+      ResourceId: table/birthday
+      RoleARN: !GetAtt TableScalingRole.Arn
+      ScalableDimension: dynamodb:table:WriteCapacityUnits
+      ServiceNamespace: dynamodb
+  TableWriteScalingPolicy:
+    Type: "AWS::ApplicationAutoScaling::ScalingPolicy"
+    Properties:
+      PolicyName: WriteAutoScalingPolicy
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId:
+        Ref: TableWriteTarget
+      TargetTrackingScalingPolicyConfiguration:
+        TargetValue: 70
+        ScaleInCooldown: 60
+        ScaleOutCooldown: 60
+        PredefinedMetricSpecification:
+          PredefinedMetricType: DynamoDBWriteCapacityUtilization
+  TableReadScalingPolicy:
+    Type: "AWS::ApplicationAutoScaling::ScalingPolicy"
+    Properties:
+      PolicyName: ReadAutoScalingPolicy
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId:
+        Ref: TableReadTarget
+      TargetTrackingScalingPolicyConfiguration:
+        TargetValue: 70
+        ScaleInCooldown: 60
+        ScaleOutCooldown: 60
+        PredefinedMetricSpecification:
+          PredefinedMetricType: DynamoDBReadCapacityUtilization
 
 Outputs:
   URL:
