@@ -2,6 +2,6 @@
 
 .idea
 .DS_Store
-package.yml
+*_serverless_package.yml
 .env
-deployments/dist
+deployments/serverless/dist

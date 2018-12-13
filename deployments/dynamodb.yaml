@@ -1,38 +1,11 @@
 AWSTemplateFormatVersion: 2010-09-09
-Transform: AWS::Serverless-2016-10-31
+Parameters:
+  DataTable:
+    Type: String
+    Description: Database table name for storing the birthday
+    Default: BirthdayRemainder
+
 Resources:
-  GetPersonLambda:
-    Type: AWS::Serverless::Function
-    Properties:
-      Handler: dist/handler/getHandler
-      Runtime: go1.x
-      Tracing: Active
-      Policies: AmazonDynamoDBReadOnlyAccess
-      Environment:
-        Variables:
-            TABLE_NAME: !Ref Table
-      Events:
-        GetEvent:
-          Type: Api
-          Properties:
-            Path: /hello/{name}
-            Method: get
-  PutPersonLambda:
-    Type: AWS::Serverless::Function
-    Properties:
-      Handler: dist/handler/putHandler
-      Runtime: go1.x
-      Tracing: Active
-      Policies: AmazonDynamoDBFullAccess
-      Environment:
-        Variables:
-          TABLE_NAME: !Ref Table
-      Events:
-        GetEvent:
-          Type: Api
-          Properties:
-            Path: /hello/{name}
-            Method: put
   Table:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -44,10 +17,12 @@ Resources:
         -
           AttributeName: "name"
           KeyType: "HASH"
-      TableName: "birthday"
+      TableName: !Ref DataTable
       ProvisionedThroughput:
         ReadCapacityUnits: 5
         WriteCapacityUnits: 5
+      StreamSpecification:
+        StreamViewType: "NEW_AND_OLD_IMAGES"
   TableScalingRole:
     Type: "AWS::IAM::Role"
     Properties:
@@ -122,16 +97,3 @@ Resources:
         ScaleOutCooldown: 60
         PredefinedMetricSpecification:
           PredefinedMetricType: DynamoDBReadCapacityUtilization
-
-Outputs:
-  URL:
-    Description: URL for HTTPS Endpoint
-    Value:
-      Fn::Join:
-        - ''
-        - - https://
-          - Ref: ServerlessRestApi
-          - ".execute-api."
-          - Ref: AWS::Region
-          - ".amazonaws.com/"
-          - Ref: ServerlessRestApiProdStage

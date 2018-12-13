@@ -1,0 +1,65 @@
+AWSTemplateFormatVersion: 2010-09-09
+Transform: AWS::Serverless-2016-10-31
+Parameters:
+  DataTable:
+    Type: String
+    Description: Database table name for storing the birthday
+    Default: BirthdayRemainder
+
+Resources:
+  HealthCheckLambda:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: dist/handler/healthCheck
+      Runtime: go1.x
+      Tracing: Active
+      Events:
+        GetEvent:
+          Type: Api
+          Properties:
+            Path: /healthcheck
+            Method: get
+  GetPersonLambda:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: dist/handler/getHandler
+      Runtime: go1.x
+      Tracing: Active
+      Policies: AmazonDynamoDBReadOnlyAccess
+      Environment:
+        Variables:
+            TABLE_NAME: !Ref DataTable
+      Events:
+        GetEvent:
+          Type: Api
+          Properties:
+            Path: /hello/{name}
+            Method: get
+  PutPersonLambda:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: dist/handler/putHandler
+      Runtime: go1.x
+      Tracing: Active
+      Policies: AmazonDynamoDBFullAccess
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref DataTable
+      Events:
+        GetEvent:
+          Type: Api
+          Properties:
+            Path: /hello/{name}
+            Method: put
+Outputs:
+  URL:
+    Description: URL for HTTPS Endpoint
+    Value:
+      Fn::Join:
+        - ''
+        - - https://
+          - Ref: ServerlessRestApi
+          - ".execute-api."
+          - Ref: AWS::Region
+          - ".amazonaws.com/"
+          - Ref: ServerlessRestApiProdStage

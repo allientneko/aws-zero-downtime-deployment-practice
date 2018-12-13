@@ -1,13 +1,13 @@
 include .env
 
 clean:
-		@rm -rf deployments/dist
-		@mkdir -p deployments/dist
+		@rm -rf deployments/serverless/dist
+		@mkdir -p deployments/serverless/dist
 
 build: clean
-		GOOS=linux go build -o deployments/dist/handler/getHandler aws/event/apigateway/getHandler.go aws/event/apigateway/dynamodb.go
-		GOOS=linux go build -o deployments/dist/handler/putHandler aws/event/apigateway/putHandler.go aws/event/apigateway/dynamodb.go
-
+		GOOS=linux go build -o deployments/serverless/dist/handler/getHandler aws/event/apigateway/getHandler.go aws/event/apigateway/dynamodb.go
+		GOOS=linux go build -o deployments/serverless/dist/handler/putHandler aws/event/apigateway/putHandler.go aws/event/apigateway/dynamodb.go
+		GOOS=linux go build -o deployments/serverless/dist/handler/healthCheck aws/event/apigateway/healthCheck.go
 
 run:
 		aws-sam-local local start-api
@@ -28,31 +28,64 @@ test:
 
 configure:
 		aws s3api create-bucket \
-			--bucket $(AWS_BUCKET_NAME) \
-			--region $(AWS_REGION) \
-			--create-bucket-configuration LocationConstraint=$(AWS_REGION)
+			--bucket $(AWS_REGION_1)-$(AWS_BUCKET_NAME) \
+			--region $(AWS_REGION_1) \
+			--create-bucket-configuration LocationConstraint=$(AWS_REGION_1)
+		aws s3api create-bucket \
+			--bucket $(AWS_REGION_2)-$(AWS_BUCKET_NAME) \
+			--region $(AWS_REGION_2) \
+			--create-bucket-configuration LocationConstraint=$(AWS_REGION_2)
+dynamodb:
+		aws cloudformation deploy \
+			--template-file deployments/dynamodb.yaml \
+			--region $(AWS_REGION_1) \
+			--capabilities CAPABILITY_IAM \
+			--stack-name $(AWS_DATABASE_STACK_NAME) \
+			--parameter-overrides DataTable=$(AWS_DATATABLE_NAME)
+		aws cloudformation deploy \
+			--template-file deployments/dynamodb.yaml \
+			--region $(AWS_REGION_2) \
+			--capabilities CAPABILITY_IAM \
+			--stack-name $(AWS_DATABASE_STACK_NAME) \
+			--parameter-overrides DataTable=$(AWS_DATATABLE_NAME)
+		aws dynamodb create-global-table \
+			--global-table-name $(AWS_DATATABLE_NAME) \
+			--replication-group RegionName=$(AWS_REGION_1) RegionName=$(AWS_REGION_2) \
+			--region $(AWS_REGION_1)
 
 package: build
 		@aws cloudformation package \
-			--template-file deployments/serverless-template.yaml \
-			--s3-bucket $(AWS_BUCKET_NAME) \
-			--region $(AWS_REGION) \
-			--output-template-file package.yml
+			--template-file deployments/serverless/serverless-template.yaml \
+			--s3-bucket $(AWS_REGION_1)-$(AWS_BUCKET_NAME) \
+			--region $(AWS_REGION_1) \
+			--output-template-file $(AWS_REGION_1)_serverless_package.yml
+		@aws cloudformation package \
+			--template-file deployments/serverless/serverless-template.yaml \
+			--s3-bucket $(AWS_REGION_2)-$(AWS_BUCKET_NAME) \
+			--region $(AWS_REGION_2) \
+			--output-template-file $(AWS_REGION_2)_serverless_package.yml
 
 deploy:
 		@aws cloudformation deploy \
-			--template-file package.yml \
-			--region $(AWS_REGION) \
+			--template-file $(AWS_REGION_1)_serverless_package.yml \
+			--region $(AWS_REGION_1) \
 			--capabilities CAPABILITY_IAM \
-			--stack-name $(AWS_STACK_NAME)
-
-describe:
-		@aws cloudformation describe-stacks \
-			--region $(AWS_REGION) \
-			--stack-name $(AWS_STACK_NAME) \
-
-outputs:
-		@make describe | jq -r '.Stacks[0].Outputs'
+			--stack-name $(AWS_LAMBDA_STACK_NAME) \
+			--parameter-overrides DataTable=$(AWS_DATATABLE_NAME)
+		@aws cloudformation deploy \
+			--template-file $(AWS_REGION_2)_serverless_package.yml \
+			--region $(AWS_REGION_2) \
+			--capabilities CAPABILITY_IAM \
+			--stack-name $(AWS_LAMBDA_STACK_NAME) \
+			--parameter-overrides DataTable=$(AWS_DATATABLE_NAME)
 
 url:
-		@make describe | jq -r ".Stacks[0].Outputs[0].OutputValue" -j
+		@aws cloudformation describe-stacks \
+			--region $(AWS_REGION_1) \
+			--stack-name $(AWS_LAMBDA_STACK_NAME) \
+			| jq -r ".Stacks[0].Outputs[0].OutputValue" -j
+		@echo "\n"
+		@aws cloudformation describe-stacks \
+			--region $(AWS_REGION_2) \
+			--stack-name $(AWS_LAMBDA_STACK_NAME) \
+			| jq -r ".Stacks[0].Outputs[0].OutputValue" -j
