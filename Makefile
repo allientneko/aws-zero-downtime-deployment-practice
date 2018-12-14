@@ -89,3 +89,10 @@ url:
 			--region $(AWS_REGION_2) \
 			--stack-name $(AWS_LAMBDA_STACK_NAME) \
 			| jq -r ".Stacks[0].Outputs[0].OutputValue" -j
+
+dns:
+		@aws cloudformation deploy \
+			--template-file deployments/serverless/cross-region-dns.yaml \
+			--region $(AWS_REGION_1) \
+			--stack-name $(AWS_LAMBDA_STACK_NAME)_DNS \
+			--parameter-overrides Region1=$(AWS_REGION_1) Region2=$(AWS_REGION_2) HostedZoneId=$(AWS_HOSTED_ZONE_ID) MultiregionEndpoint=$(AWS_CROSSREGION_DOMAIN) Region1Endpoint=$(AWS_REGION1_ENDPOINT) Region2Endpoint=$(AWS_REGION2_ENDPOINT) Region1HealthEndpoint=$(AWS_REGION1_HEALTHCHECK_ENDPOINT) Region2HealthEndpoint=$(AWS_REGION2_HEALTHCHECK_ENDPOINT)
