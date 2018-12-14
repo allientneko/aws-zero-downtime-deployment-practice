@@ -4,8 +4,11 @@ Parameters:
   DataTable:
     Type: String
     Description: Database table name for storing the birthday
-    Default: BirthdayRemainder
-
+    Default: BirthdayReminder
+Globals:
+  Api:
+    Name: birthday-reminder
+    EndpointConfiguration: REGIONAL
 Resources:
   HealthCheckLambda:
     Type: AWS::Serverless::Function
@@ -51,6 +54,54 @@ Resources:
           Properties:
             Path: /hello/{name}
             Method: put
+  ApiCustomDomain:
+    Type: AWS::ApiGateway::DomainName
+    Properties:
+      RegionalCertificateArn: !ImportValue 'birthday-gateway-api-certificate'
+      DomainName: !ImportValue 'birthday-gateway-api-custom-domain'
+      EndpointConfiguration:
+        Types:
+          - REGIONAL
+  ApiBasePathMapping:
+    Type: AWS::ApiGateway::BasePathMapping
+    Properties:
+      BasePath: v1
+      DomainName: !ImportValue 'birthday-gateway-api-custom-domain'
+      RestApiId: !Ref ServerlessRestApi
+      Stage: !Ref ServerlessRestApiProdStage
+  Healthcheck:
+    Type: "AWS::Route53::HealthCheck"
+    Properties:
+      HealthCheckConfig:
+        Port: "443"
+        Type: "HTTPS_STR_MATCH"
+        SearchString: "ok"
+        ResourcePath: "/Prod/healthcheck"
+        FullyQualifiedDomainName:
+          Fn::Join:
+            - ''
+            - - !Ref ServerlessRestApi
+              - ".execute-api."
+              - !Ref AWS::Region
+              - .amazonaws.com
+        RequestInterval: "30"
+        FailureThreshold: "2"
+  RegionEndpointRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      Region: !Ref AWS::Region
+      HealthCheckId: !Ref Healthcheck
+      SetIdentifier:
+        Fn::Join:
+          - ''
+          - - 'birthday-endpoint-'
+            - !Ref AWS::Region
+      HostedZoneId: !ImportValue 'birthday-gateway-api-custom-hosted-zone-id'
+      Name: !ImportValue 'birthday-gateway-api-custom-domain'
+      Type: CNAME
+      TTL: 60
+      ResourceRecords:
+        - !GetAtt ApiCustomDomain.RegionalDomainName
 Outputs:
   URL:
     Description: URL for HTTPS Endpoint

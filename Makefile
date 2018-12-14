@@ -23,6 +23,21 @@ install-dev:
 install-mod:
 		go mod download
 
+certificate:
+		aws cloudformation deploy \
+			--template-file deployments/serverless/acm-certificate.yaml \
+			--region $(AWS_REGION_1) \
+			--capabilities CAPABILITY_IAM \
+			--stack-name $(AWS_CERTIFICATE_STACK_NAME) \
+			--parameter-overrides Domain=$(AWS_CROSSREGION_DOMAIN) HostedZoneID=$(AWS_HOSTED_ZONE_ID)
+		aws cloudformation deploy \
+			--template-file deployments/serverless/acm-certificate.yaml \
+            --region $(AWS_REGION_2) \
+            --capabilities CAPABILITY_IAM \
+            --stack-name $(AWS_CERTIFICATE_STACK_NAME) \
+            --parameter-overrides Domain=$(AWS_CROSSREGION_DOMAIN) HostedZoneID=$(AWS_HOSTED_ZONE_ID)
+
+
 test:
 		go test ./... --cover
 

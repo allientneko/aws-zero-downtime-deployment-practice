@@ -1,0 +1,31 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Setting up ACM Certificate for API Gateway.
+Parameters:
+  Domain:
+    Description: The FQDN used for the Gateway API
+    Type: String
+  HostedZoneID:
+    Description: HostedZoneID for the custom domain.
+    Type: String
+Resources:
+  Certificate:
+    Type: 'AWS::CertificateManager::Certificate'
+    Properties:
+      DomainName: !Ref Domain
+      ValidationMethod: DNS
+Outputs:
+  CertificateArn:
+    Description: Arn of the ACM certificates
+    Value: !Ref Certificate
+    Export:
+      Name: birthday-gateway-api-certificate
+  HostedZoneID:
+    Description: HostedZoneID for the domain.
+    Value: !Ref HostedZoneID
+    Export:
+      Name: birthday-gateway-api-custom-hosted-zone-id
+  Domain:
+    Description: The FQDN used for the Gateway API
+    Value: !Ref Domain
+    Export:
+      Name: birthday-gateway-api-custom-domain
