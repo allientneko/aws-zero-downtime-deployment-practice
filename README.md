@@ -8,7 +8,7 @@ Structure: active-active, multi-region backend.
 
 In `aws/event/apigateway/` contains the code for lambda function.
 
-The script will deploy to two region for high availability.  
+The script will deploy to multiple regions for high availability.  
 
 ##### First of all, you need to have a hosted zone in Route53. This domain will be use for your multi-region app endpoint.
 
@@ -38,8 +38,8 @@ AWS_LAMBDA_STACK_NAME=birthday-reminder
 AWS_DATABASE_STACK_NAME=birthday-reminder-db
 AWS_DATATABLE_NAME=birthday
 AWS_REGION=eu-central-1 eu-west-1
-AWS_CROSSREGION_DOMAIN=example.com
-AWS_HOSTED_ZONE_ID=<ZONE ID>
+AWS_CROSSREGION_DOMAIN=<example.com>
+AWS_HOSTED_ZONE_ID=<ZONE ID of example.com>
 AWS_BASEPATH_MAPPING=v1
 ```
 
