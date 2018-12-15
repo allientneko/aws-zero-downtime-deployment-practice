@@ -1,0 +1,233 @@
+AWSTemplateFormatVersion: 2010-09-09
+Transform: AWS::Serverless-2016-10-31
+Parameters:
+  DataTable:
+    Type: String
+    Description: Database table name for storing the birthday
+    Default: BirthdayReminder
+  Domain:
+    Description: The FQDN used for the Gateway API
+    Type: String
+  Basepath:
+    Type: String
+    Description: Basepath mapping for custom domain, normally use for API versioning
+    Default: v1
+  HostedZoneID:
+    Description: HostedZoneID for the custom domain.
+    Type: String
+Globals:
+  Api:
+    Name: birthday-reminder
+    EndpointConfiguration: REGIONAL
+Resources:
+  CustomDomainCertificate:
+    Type: 'AWS::CertificateManager::Certificate'
+    Properties:
+      DomainName: !Ref Domain
+      ValidationMethod: DNS
+  Table:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: "name"
+          AttributeType: "S"
+      KeySchema:
+        - AttributeName: "name"
+          KeyType: "HASH"
+      TableName: !Ref DataTable
+      ProvisionedThroughput:
+        ReadCapacityUnits: 5
+        WriteCapacityUnits: 5
+      StreamSpecification:
+        StreamViewType: "NEW_AND_OLD_IMAGES"
+  TableScalingRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - "application-autoscaling.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      Path: "/"
+      Policies:
+        - PolicyName: root
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "dynamodb:DescribeTable"
+                  - "dynamodb:UpdateTable"
+                  - "cloudwatch:PutMetricAlarm"
+                  - "cloudwatch:DescribeAlarms"
+                  - "cloudwatch:GetMetricStatistics"
+                  - "cloudwatch:SetAlarmState"
+                  - "cloudwatch:DeleteAlarms"
+                Resource: "*"
+  TableReadTarget:
+    Type: AWS::ApplicationAutoScaling::ScalableTarget
+    DependsOn: TableScalingRole
+    Properties:
+      MaxCapacity: 1000
+      MinCapacity: 5
+      ResourceId: !Join
+        - /
+        - - table
+          - !Ref DataTable
+      RoleARN: !GetAtt TableScalingRole.Arn
+      ScalableDimension: dynamodb:table:ReadCapacityUnits
+      ServiceNamespace: dynamodb
+  TableWriteTarget:
+    Type: AWS::ApplicationAutoScaling::ScalableTarget
+    DependsOn: TableScalingRole
+    Properties:
+      MaxCapacity: 1000
+      MinCapacity: 5
+      ResourceId: !Join
+        - /
+        - - table
+          - !Ref DataTable
+      RoleARN: !GetAtt TableScalingRole.Arn
+      ScalableDimension: dynamodb:table:WriteCapacityUnits
+      ServiceNamespace: dynamodb
+  TableWriteScalingPolicy:
+    Type: "AWS::ApplicationAutoScaling::ScalingPolicy"
+    Properties:
+      PolicyName: WriteAutoScalingPolicy
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId:
+        Ref: TableWriteTarget
+      TargetTrackingScalingPolicyConfiguration:
+        TargetValue: 70
+        ScaleInCooldown: 60
+        ScaleOutCooldown: 60
+        PredefinedMetricSpecification:
+          PredefinedMetricType: DynamoDBWriteCapacityUtilization
+  TableReadScalingPolicy:
+    Type: "AWS::ApplicationAutoScaling::ScalingPolicy"
+    Properties:
+      PolicyName: ReadAutoScalingPolicy
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId:
+        Ref: TableReadTarget
+      TargetTrackingScalingPolicyConfiguration:
+        TargetValue: 70
+        ScaleInCooldown: 60
+        ScaleOutCooldown: 60
+        PredefinedMetricSpecification:
+          PredefinedMetricType: DynamoDBReadCapacityUtilization
+  HealthCheckLambda:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: dist/handler/healthCheck
+      Runtime: go1.x
+      Tracing: Active
+      Events:
+        GetEvent:
+          Type: Api
+          Properties:
+            Path: /healthcheck
+            Method: get
+  GetPersonLambda:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: dist/handler/getHandler
+      Runtime: go1.x
+      Tracing: Active
+      Policies: AmazonDynamoDBReadOnlyAccess
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref Table
+      Events:
+        GetEvent:
+          Type: Api
+          Properties:
+            Path: /hello/{name}
+            Method: get
+  PutPersonLambda:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: dist/handler/putHandler
+      Runtime: go1.x
+      Tracing: Active
+      Policies: AmazonDynamoDBFullAccess
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref Table
+      Events:
+        GetEvent:
+          Type: Api
+          Properties:
+            Path: /hello/{name}
+            Method: put
+  ApiCustomDomain:
+    Type: AWS::ApiGateway::DomainName
+    Properties:
+      RegionalCertificateArn: !Ref CustomDomainCertificate
+      DomainName: !Ref Domain
+      EndpointConfiguration:
+        Types:
+          - REGIONAL
+  ApiBasePathMapping:
+    Type: AWS::ApiGateway::BasePathMapping
+    Properties:
+      BasePath: !Ref Basepath
+      DomainName: !Ref Domain
+      RestApiId: !Ref ServerlessRestApi
+      Stage: !Ref ServerlessRestApiProdStage
+    DependsOn:
+      - ApiCustomDomain
+  Healthcheck:
+    Type: "AWS::Route53::HealthCheck"
+    Properties:
+      HealthCheckConfig:
+        Port: "443"
+        Type: "HTTPS_STR_MATCH"
+        SearchString: "ok"
+        ResourcePath:
+          Fn::Join:
+            - ''
+            - - "/"
+              - !Ref ServerlessRestApiProdStage
+              - "/healthcheck"
+        FullyQualifiedDomainName:
+          Fn::Join:
+            - ''
+            - - !Ref ServerlessRestApi
+              - ".execute-api."
+              - !Ref AWS::Region
+              - .amazonaws.com
+        RequestInterval: "30"
+        FailureThreshold: "2"
+  RegionEndpointRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      Region: !Ref AWS::Region
+      HealthCheckId: !Ref Healthcheck
+      SetIdentifier:
+        Fn::Join:
+          - ''
+          - - 'birthday-endpoint-'
+            - !Ref AWS::Region
+      HostedZoneId: !Ref HostedZoneID
+      Name: !Ref Domain
+      Type: CNAME
+      TTL: 60
+      ResourceRecords:
+        - !GetAtt ApiCustomDomain.RegionalDomainName
+Outputs:
+  URL:
+    Description: URL for HTTPS Endpoint
+    Value:
+      Fn::Join:
+        - ''
+        - - https://
+          - Ref: ServerlessRestApi
+          - ".execute-api."
+          - Ref: AWS::Region
+          - ".amazonaws.com/"
+          - Ref: ServerlessRestApiProdStage

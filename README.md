@@ -20,8 +20,7 @@ Expiation:
 ```
 AWS_ACCOUNT_ID= Your-AWS-account-ID
 AWS_BUCKET_NAME= your-lambda-s3bucket
-AWS_LAMBDA_STACK_NAME= stack-name-for-lambda-function
-AWS_DATABASE_STACK_NAME= stack-name-for-database
+AWS_STACK_NAME= stack-name (certificate and database stack are <AWS_STACK_NAME>-certificate and <AWS_STACK_NAME>-db)
 AWS_DATATABLE_NAME= global-table-name-for-cross-region-access
 AWS_REGION= a-list-of-region-you-want-to-deploy (seperate with space)
 AWS_CROSSREGION_DOMAIN= domain-name-used-for-multi-region-access
@@ -33,13 +32,11 @@ Example:
 ```
 AWS_ACCOUNT_ID=<your account id>
 AWS_BUCKET_NAME=birthday-reminder-cloudformation-package
-AWS_CERTIFICATE_STACK_NAME=birthday-reminder-certificate-parameter
-AWS_LAMBDA_STACK_NAME=birthday-reminder
-AWS_DATABASE_STACK_NAME=birthday-reminder-db
+AWS_STACK_NAME=birthday-reminder
 AWS_DATATABLE_NAME=birthday
 AWS_REGION=eu-central-1 eu-west-1
-AWS_CROSSREGION_DOMAIN=<example.com>
-AWS_HOSTED_ZONE_ID=<ZONE ID of example.com>
+AWS_CROSSREGION_DOMAIN=<domain used for cross-region access>
+AWS_HOSTED_ZONE_ID=<HostedZoneId of AWS_CROSSREGION_DOMAIN>
 AWS_BASEPATH_MAPPING=v1
 ```
 
@@ -48,6 +45,8 @@ What is the final product look like?
 # should return your expected http respond
 $ curl https://AWS_CROSSREGION_DOMAIN/AWS_BASEPATH_MAPPING/resource
 ```
+
+After setting up the .env, you can use `make complete` to setup everything. However, this only for testing purpose only. Database and certificate suppose to be have their own stack. In practice, we need to keep the database and certificate. 
 
 #### 2. issue certificate
 ```bash
@@ -58,6 +57,8 @@ This step may be tricky. You need to go to cloudformation and check the event of
 
 Please refer the following link to do so.
 https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-certificatemanager-certificate.html#cfn-certificatemanager-certificate-validationmethod
+
+Putting the CNAME in Route53 is only required one time if you keep the CNAME in your hosted zone and reuse the domain name for the next deployment. 
 
 #### 3. deploy
 ```bash

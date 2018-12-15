@@ -73,6 +73,8 @@ Resources:
       DomainName: !ImportValue 'birthday-gateway-api-custom-domain'
       RestApiId: !Ref ServerlessRestApi
       Stage: !Ref ServerlessRestApiProdStage
+    DependsOn:
+      - ApiCustomDomain
   Healthcheck:
     Type: "AWS::Route53::HealthCheck"
     Properties:
