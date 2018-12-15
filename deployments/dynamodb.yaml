@@ -3,7 +3,7 @@ Parameters:
   DataTable:
     Type: String
     Description: Database table name for storing the birthday
-    Default: BirthdayRemainder
+    Default: BirthdayReminder
 
 Resources:
   Table:

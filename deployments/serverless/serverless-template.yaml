@@ -5,6 +5,10 @@ Parameters:
     Type: String
     Description: Database table name for storing the birthday
     Default: BirthdayReminder
+  Basepath:
+    Type: String
+    Description: Basepath mapping for custom domain, normally use for API versioning
+    Default: v1
 Globals:
   Api:
     Name: birthday-reminder
@@ -65,7 +69,7 @@ Resources:
   ApiBasePathMapping:
     Type: AWS::ApiGateway::BasePathMapping
     Properties:
-      BasePath: v1
+      BasePath: !Ref Basepath
       DomainName: !ImportValue 'birthday-gateway-api-custom-domain'
       RestApiId: !Ref ServerlessRestApi
       Stage: !Ref ServerlessRestApiProdStage
