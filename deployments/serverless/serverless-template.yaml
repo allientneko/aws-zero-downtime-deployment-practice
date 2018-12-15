@@ -80,7 +80,12 @@ Resources:
         Port: "443"
         Type: "HTTPS_STR_MATCH"
         SearchString: "ok"
-        ResourcePath: "/Prod/healthcheck"
+        ResourcePath:
+          Fn::Join:
+            - ''
+            - - "/"
+              - !Ref ServerlessRestApiProdStage
+              - "/healthcheck"
         FullyQualifiedDomainName:
           Fn::Join:
             - ''

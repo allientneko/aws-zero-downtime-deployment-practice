@@ -3,17 +3,18 @@ The program is a practice birthday reminder wrote in golang. It will be require 
 
 The deployment script can use on any Linux system. The region for 
 
-###Serverless:
+### Serverless Structure:
 Structure: active-active, multi-region backend.
 
 In `aws/event/apigateway/` contains the code for lambda function.
 
 The script will deploy to two region for high availability.  
-First of all, you need to have a hosted zone in Route53.
+
+##### First of all, you need to have a hosted zone in Route53. This domain will be use for your multi-region app endpoint.
 
 We assume you have already setup the aws-cli on your machine.
 
-####1. Create .env
+#### 1. Create .env
 
 Expiation:
 ```
@@ -42,12 +43,13 @@ AWS_HOSTED_ZONE_ID=<ZONE ID>
 AWS_BASEPATH_MAPPING=v1
 ```
 
+What is the final product look like?
 ```bash
 # should return your expected http respond
-$ curl https://example.com/v1/resource
+$ curl https://AWS_CROSSREGION_DOMAIN/AWS_BASEPATH_MAPPING/resource
 ```
 
-####2. issue certificate
+#### 2. issue certificate
 ```bash
 # issue the certificate
 $ make certificate
@@ -57,7 +59,7 @@ This step may be tricky. You need to go to cloudformation and check the event of
 Please refer the following link to do so.
 https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-certificatemanager-certificate.html#cfn-certificatemanager-certificate-validationmethod
 
-####3. deploy
+#### 3. deploy
 ```bash
 # Install go module to compile the severless program
 $ make install-mod
@@ -77,8 +79,14 @@ $ make deploy
 # Get url of the endpoint
 $ make url
 ```
+If this is your first deploy, you can simply type in the following.
+```bash
+$ make full-deploy
+```
+
 If DynamoDB is using pay_by_request mode, the auto scaling role can also removed from the template.
 
+#### 4. testing
 Check if this is working. 
 ```bash
 #health check

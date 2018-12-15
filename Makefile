@@ -78,3 +78,5 @@ url:
 			--region $(region) \
 			--stack-name $(AWS_LAMBDA_STACK_NAME) \
 			| jq -r ".Stacks[0].Outputs[0].OutputValue" -j; echo "\n"; )
+
+full-deploy: install-mod configure dynamodb package deploy
