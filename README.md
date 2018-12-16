@@ -4,6 +4,7 @@ The program is a practice birthday reminder wrote in golang. It will be require 
 The deployment script can use on any Linux system. The region for 
 
 ### Serverless Structure:
+![](image/Active-Active-structure.png)
 Structure: active-active, multi-region backend.
 
 In `aws/event/apigateway/` contains the code for lambda function.
